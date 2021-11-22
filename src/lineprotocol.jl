@@ -51,6 +51,7 @@ function table2lineprotocol(measurementname::String, datatable; precision::Union
         write(buffer, timestampstring)
         write(buffer, '\n')
     end
+    seekstart(buffer)
     return buffer
 end
 

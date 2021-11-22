@@ -1,7 +1,7 @@
-# https://docs.influxdata.com/influxdb/v2.1/api/
 module InfluxDB2
 
-using Tables
+using Tables, Dates
+
 include("lineprotocol.jl")
 include("http.jl")
 
