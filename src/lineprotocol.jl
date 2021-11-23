@@ -1,5 +1,7 @@
 # https://docs.influxdata.com/influxdb/v2.1/reference/syntax/line-protocol/
 
+using Tables, Dates
+
 const precisiondict = Base.ImmutableDict(:ns=>10.0^9, :us=>10.0^6, :ms=>10.0^3, :s=>1.0)
 
 
