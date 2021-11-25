@@ -43,7 +43,7 @@ function fluxquery(influx::InfluxServer, querystring::String)
 end
 
 
-function query(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime})
+function simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing)
     @assert length(fields)>0
     from = Dates.format(timerange[1], "yyyy-mm-ddTHH:MM:SS.sZ")
     to = Dates.format(timerange[2], "yyyy-mm-ddTHH:MM:SS.sZ")
@@ -57,7 +57,16 @@ function query(influx::InfluxServer, bucket::String, measurement::String, fields
     for f in fields[2:end]
         write(querybuffer, " or r[\"_field\"] == \"$f\"")
     end
-    write(querybuffer, ')')
+    write(querybuffer, ")\n")
+    if !isnothing(tags)
+        (k, v) = first(tags)
+        write(querybuffer, "|>filter(fn: (r)=>r[\"$(string(k))\"]==\"$(string(v))\"")
+        for (k,v) in tags[2:end]
+            write(querybuffer, " or (r)=>r[\"$(string(k))\"]==\"$(string(v))\"")
+        end
+        write(querybuffer, ")\n")
+    end
+    write(querybuffer, "|>group(columns: [\"_field\"], mode: \"by\")")
     return fluxquery(influx, String(take!(querybuffer)))
 end
 

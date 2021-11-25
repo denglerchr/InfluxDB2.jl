@@ -1,4 +1,4 @@
-using CSV, DataFrames, InfluxDB2, Random
+using CSV, DataFrames, InfluxDB2, Random, Dates
 
 # Lineprotocol
 testtable = CSV.File(joinpath(@__DIR__, "testtable.csv"))
@@ -10,25 +10,27 @@ print(String(take!(iobuffer)))
 
 
 # Create InfluxDB2 object for following operations
-token = "mROH4PvnsKOaDRbZfFH6u5wLxGRg1ZGPdAuE-pjNWZ80pX2FUYSkNeLH53hPhA1UIMOiWjokPT_2E0ZkT3LGxA=="
-influx = InfluxServer("http://localhost:8086", "Home", token)
+token = read(joinpath(@__DIR__, "token.txt"), String)
+#"mROH4PvnsKOaDRbZfFH6u5wLxGRg1ZGPdAuE-pjNWZ80pX2FUYSkNeLH53hPhA1UIMOiWjokPT_2E0ZkT3LGxA=="
+influx = InfluxServer("http://localhost:8086", "home", token)
 
 # Writing
 ndata = 10
-testtable = DataFrame(("timestamp"=>[now(UTC)-Second(ndata)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[randstring(5) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
+testtable = DataFrame(Dict("timestamp"=>[now(UTC)-Second(ndata)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[randstring(5) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
 measurementname = "juliatest"
-bucket = "Test"
+bucket = "test"
 resp = writetable(influx, bucket, measurementname, testtable)
 
 # Reading
-querystring = "from(bucket: \"Test\")
-|> range(start: -3d)
-|> filter(fn: (r) => r[\"_measurement\"] == \"juliatest\")"
+data = simplequery(influx, bucket, measurementname, ["Floatfield", "Intfield"], (now(UTC)-Day(2), now(UTC)); tags = ["tag1"=>"hello"])
+
+
+querystring = "from(bucket: \"test\")
+|>range(start: $(Dates.format(now(UTC)-Day(2), "yyyy-mm-ddTHH:MM:SS.sZ")), stop: $(Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS.sZ")))
+|>filter(fn: (r) => r[\"_measurement\"] == \"juliatest\")
+|>filter(fn: (r) =>r[\"_field\"] == \"Floatfield\" or r[\"_field\"] == \"Intfield\")
+|>filter(fn: (r) =>r[\"tag1\"] == \"hello\")
+|>group(columns: [\"_field\"], mode: \"by\")"
 
 data = fluxquery(influx, querystring)
 
-querystring = "from(bucket: \"Test\")
-  |> range(start: -7d)
-  |> filter(fn: (r) => r[\"_measurement\"] == \"juliatest\")
-  |> filter(fn: (r) => r[\"_field\"] == \"b\" or r[\"_field\"] == \"c\" or r[\"_field\"] == \"e\")
-  |> yield(name: \"mean\")"
