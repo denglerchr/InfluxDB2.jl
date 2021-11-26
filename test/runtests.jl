@@ -22,7 +22,7 @@ bucket = "test"
 resp = writetable(influx, bucket, measurementname, testtable)
 
 # Reading
-data = simplequery(influx, bucket, measurementname, ["Floatfield", "Intfield"], (now(UTC)-Day(2), now(UTC)); tags = ["tag1"=>"hello"])
+data = simplequery(influx, bucket, measurementname, ["Floatfield", "Intfield"], (now(UTC)-Day(2), now(UTC)); tags = ["tag1"=>"hello", "tag2" =>"hi"])
 
 
 querystring = "from(bucket: \"test\")
@@ -30,7 +30,8 @@ querystring = "from(bucket: \"test\")
 |>filter(fn: (r) => r[\"_measurement\"] == \"juliatest\")
 |>filter(fn: (r) =>r[\"_field\"] == \"Floatfield\" or r[\"_field\"] == \"Intfield\")
 |>filter(fn: (r) =>r[\"tag1\"] == \"hello\")
-|>group(columns: [\"_field\"], mode: \"by\")"
+|>group(columns: [\"_field\"], mode: \"by\")
+|>tail(n: 2)"
 
 data = fluxquery(influx, querystring)
 

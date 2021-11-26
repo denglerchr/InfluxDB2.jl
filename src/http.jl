@@ -7,12 +7,36 @@ struct InfluxServer
     url::String
     org::String
     token::String
+    function InfluxServer(url::String, org::String, token::String)
+        resp = HTTP.get(url*"/ping", status_exception = false)
+        if resp.status != 204
+            println("Could not ping influxdb server. Response: $(resp.body)")
+        end
+        return new(url, org, token)
+    end
 end
 
 
+"""
+    writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms)
+
+Write a table to the influx database. Fields and tags need to be
+specified using prefixes \"f_\" and \"t_\" respectively. A column namd timestamp needs to
+be provided which contains Int or DateTime entries.
+"""
 function writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms)
     buffer = table2lineprotocol(measurement, table, precision = precision)
     return write(influx, bucket, buffer; precision = precision)
+end
+
+
+"""
+    writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms)
+
+Write data using the lineprotocol.
+"""
+function writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms)
+    return write(influx, bucket, IOBuffer(linep); precision = precision)
 end
 
 
@@ -24,15 +48,45 @@ function write(influx::InfluxServer, bucket::String, body::IOBuffer; precision::
 end
 
 
-function listbuckets(influx::InfluxServer)
-    url = influx.url*"/api/v2/buckets?org="*influx.org
-    headers = ["Authorization"=>"Token "*influx.token, "Accept"=>"application/json"]
-    resp =  HTTP.get(url, headers)
-    jsonobj = JSON3.read(resp.body)
-    return [b.name for b in jsonobj.buckets]
+listbuckets(influx::InfluxServer) = fluxquery(influx, "buckets()")
+listmeasurements(influx::InfluxServer, bucket::String) = fluxquery(influx, "import \"influxdata/influxdb/schema\"\nschema.measurements(bucket: \"$bucket\")")
+function listfields(influx::InfluxServer, bucket::String, measurement::String)
+    querystring = "import \"influxdata/influxdb/schema\"\n
+    schema.measurementFieldKeys(\n
+    bucket: \"$bucket\",\n
+    measurement: \"$measurement\")"
+    return fluxquery(influx, querystring)
 end
 
 
+"""
+    listorgs(influx::InfluxServer)
+
+Return tuples containing the name and id of the organisations.
+"""
+function listorgs(influx::InfluxServer)
+    url = influx.url*"/api/v2/orgs"
+    headers = ["Authorization"=>"Token "*influx.token]
+    resp =  HTTP.get(url, headers)
+    jsonobj = JSON3.read(resp.body)
+    return [(o.name, o.id) for o in jsonobj.orgs]
+end
+
+
+function getorgid(influx::InfluxServer)
+    url = influx.url*"/api/v2/orgs?org="*influx.org
+    headers = ["Authorization"=>"Token "*influx.token]
+    resp =  HTTP.get(url, headers)
+    jsonobj = JSON3.read(resp.body)
+    return jsonobj.orgs[1].id
+end
+
+
+"""
+    fluxquery(influx::InfluxServer, querystring::String)
+
+Query data and return a DataFrame for each table returned by InfluxDB.
+"""
 function fluxquery(influx::InfluxServer, querystring::String)
     url = influx.url*"/api/v2/query?org="*influx.org
     # TODO add gzip possibility
@@ -43,6 +97,9 @@ function fluxquery(influx::InfluxServer, querystring::String)
 end
 
 
+"""
+    simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing)
+"""
 function simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing)
     @assert length(fields)>0
     from = Dates.format(timerange[1], "yyyy-mm-ddTHH:MM:SS.sZ")
@@ -59,10 +116,14 @@ function simplequery(influx::InfluxServer, bucket::String, measurement::String, 
     end
     write(querybuffer, ")\n")
     if !isnothing(tags)
-        (k, v) = first(tags)
+        i = iterate(tags)
+        (k, v) = i[1]
         write(querybuffer, "|>filter(fn: (r)=>r[\"$(string(k))\"]==\"$(string(v))\"")
-        for (k,v) in tags[2:end]
-            write(querybuffer, " or (r)=>r[\"$(string(k))\"]==\"$(string(v))\"")
+        i = iterate(tags, i[2])
+        while !isnothing(i)
+            (k, v) = i[1]
+            write(querybuffer, " or r[\"$(string(k))\"]==\"$(string(v))\"")
+            i = iterate(tags, i[2])
         end
         write(querybuffer, ")\n")
     end
@@ -73,11 +134,13 @@ end
 
 
 """
+    parseinfluxresp(respstr::AbstractString)
+
 Parses the annotated CSV table responses from Influx.
 Return a DataFrame for each table.
 Annotation needs to be "datatype".
 """
-function parseinfluxresp(respstr)
+function parseinfluxresp(respstr::AbstractString)
     influxtypesdict = Base.ImmutableDict("string"=>String,"long"=>Int64, "boolean"=>Bool, "dateTime:RFC3339"=>String, "double"=>Float64)
 
     # split in tables and remove last empty entry
@@ -115,3 +178,6 @@ function parseRFC3339(dtiso)
     millisecond = parse(Int,dtiso2[21:23])
     DateTime(year, month, day, hour, minute, second, millisecond)
 end
+
+
+ping(influx::InfluxServer) = HTTP.get(influx.url*"/ping")
