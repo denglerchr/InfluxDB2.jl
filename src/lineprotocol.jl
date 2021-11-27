@@ -4,7 +4,6 @@ using Tables, Dates
 
 const precisiondict = Base.ImmutableDict(:ns=>10.0^9, :us=>10.0^6, :ms=>10.0^3, :s=>1.0)
 
-
 function table2lineprotocol(measurementname::String, datatable; precision::Union{Symbol, String} = :ms)
 
     # basic checks
@@ -19,13 +18,13 @@ function table2lineprotocol(measurementname::String, datatable; precision::Union
         T = Tables.columntype(datatable, fname)
         @assert(T<:Union{AbstractFloat, Integer, AbstractString, Bool, Missing}, "Only numbers and strings are supported, got $T in field $(string(fname)[3:end])")
     end
-    
+
     tagnames = filter(x->startswith(string(x), "t_") && length(string(x))>2, colnames)
     for tname in tagnames
         T = Tables.columntype(datatable, tname)
         @assert(T<:Union{AbstractString, Missing}, "Tags must be of type String, got $T in tag $(string(tname)[3:end])")
     end
- 
+
     @assert(:timestamp in colnames, "The table needs to have a column \"timestamp\".")
     @assert( !isempty(fieldnames), "Atleast one field must be provided, i.e., a column name starting with \"f_\"")
     sort!(fieldnames)
@@ -33,7 +32,7 @@ function table2lineprotocol(measurementname::String, datatable; precision::Union
 
     # Create strings for fields, tags and timestamps
     rows = Tables.rows(datatable)
-    
+
     # accumulate string in a buffer
     buffer = IOBuffer()
     for row in rows

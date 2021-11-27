@@ -2,6 +2,8 @@
 Simple reading from and writing to InfluxDB v2 .
 
 ## Writing
+### Writing a Table
+
 Create a Tables.jl object, e.g., a DataFrame. The Table needs to have a column "timestamp", columns with names that start with "f_" will be used as fields ("f_" is removed before writing), and columns starting with "t_" are used as tags ("t_" is removed).
 
 Example
@@ -10,8 +12,20 @@ org = ...
 token = ...
 influx = InfluxServer("http://localhost:8086", org, token)
 
-data = DataFrame(Dict("timestamp" = [now(UTC)-Second(1), now(UTC)], "f_somefield" = [1.0, 2.0]))
+data = DataFrame(Dict("timestamp" => [now(UTC)-Second(1), now(UTC)], "f_somefield" => [1.0, 2.0]))
 writetable(influx, data)
+```
+
+### Writing line protocol
+Example
+```julia
+org = ...
+token = ...
+influx = InfluxServer("http://localhost:8086", org, token)
+
+linep = "mymeasurement somefield=1.0 1638004387370
+mymeasurement somefield=2.0 1638004388378"
+writelineprotocol(influx, linep)
 ```
 
 ## Reading
@@ -26,7 +40,7 @@ org = ...
 token = ...
 influx = InfluxServer("http://localhost:8086", org, token)
 
-# A query 
+# A query
 bucket = "testbucket"
 measurement = "mymeasurement"
 fields = ["somefield", "anotherfield"]
