@@ -31,7 +31,7 @@ writelineprotocol(influx, linep)
 ## Reading
 Queries return a DataFrame for each table in the response.
 Two possibilities for queries
-1) `simplequery` does not require the flux language but is quite limited. Returns a dataframe for each field.
+1) `simplequery` does not require the flux language but is quite limited. Returns a dataframe for each field, grouped by field and sorted by time.
 2) writing a flux query string and using `fluxquery`
 
 Example:
@@ -54,6 +54,7 @@ querystring = "from(bucket: \"testbucket\")
 |>filter(fn: (r) => r[\"_measurement\"] == \"mymeasurement\")
 |>filter(fn: (r) =>r[\"_field\"] == \"somefield\" or r[\"_field\"] == \"anotherfield\")
 |>filter(fn: (r) =>r[\"sometag\"] == \"TagValue\")
-|>group(columns: [\"_field\"], mode: \"by\")"
+|>group(columns: [\"_field\"], mode: \"by\")
+|>sort(columns: [\"_time\"])"
 dataframes = fluxquery(influx, querystring)
 ```

@@ -128,6 +128,7 @@ function simplequery(influx::InfluxServer, bucket::String, measurement::String, 
         write(querybuffer, ")\n")
     end
     write(querybuffer, "|>group(columns: [\"_field\"], mode: \"by\")")
+    write(querybuffer, "|>sort(columns: [\"_time\"])")
     return fluxquery(influx, String(take!(querybuffer)))
 end
 
