@@ -1,37 +1,43 @@
-using CSV, DataFrames, InfluxDB2, Random, Dates
+using CSV, DataFrames, InfluxDB2, Dates, Test, HTTP
 
 # Lineprotocol
-testtable = CSV.File(joinpath(@__DIR__, "testtable.csv"))
-testtable = CSV.File(joinpath(@__DIR__, "testtable_notag.csv"))
-testtable = CSV.File(joinpath(@__DIR__, "testtable_missing.csv"))
+@testset "lineprotocol" begin
+    testtable = CSV.File(joinpath(@__DIR__, "testtable.csv"))
 
-iobuffer = table2lineprotocol("testmeasurement", testtable; precision = :ms)
-print(String(take!(iobuffer)))
-
-
-# Create InfluxDB2 object for following operations
-token = read(joinpath(@__DIR__, "token.txt"), String)
-#"mROH4PvnsKOaDRbZfFH6u5wLxGRg1ZGPdAuE-pjNWZ80pX2FUYSkNeLH53hPhA1UIMOiWjokPT_2E0ZkT3LGxA=="
-influx = InfluxServer("http://localhost:8086", "home", token)
-
-# Writing
-ndata = 10
-testtable = DataFrame(Dict("timestamp"=>[now(UTC)-Second(ndata)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[randstring(5) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
-measurementname = "juliatest"
-bucket = "test"
-resp = writetable(influx, bucket, measurementname, testtable)
-
-# Reading
-data = simplequery(influx, bucket, measurementname, ["Floatfield", "Intfield"], (now(UTC)-Day(2), now(UTC)); tags = ["tag1"=>"hello", "tag2" =>"hi"])
+    iobuffer = InfluxDB2.table2lineprotocol("testmeasurement", testtable; precision = :ms)
+    correctlinep = "testmeasurement,c=hello b=2.0 1637496010000\ntestmeasurement,c=world b=4.0 1637496070000\ntestmeasurement,c=hello b=6.0 1637496130000\n"
+    @test String(take!(iobuffer)) == correctlinep
+end
 
 
-querystring = "from(bucket: \"test\")
-|>range(start: $(Dates.format(now(UTC)-Day(2), "yyyy-mm-ddTHH:MM:SS.sZ")), stop: $(Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS.sZ")))
-|>filter(fn: (r) => r[\"_measurement\"] == \"juliatest\")
-|>filter(fn: (r) =>r[\"_field\"] == \"Floatfield\" or r[\"_field\"] == \"Intfield\")
-|>filter(fn: (r) =>r[\"tag1\"] == \"hello\")
-|>group(columns: [\"_field\"], mode: \"by\")
-|>tail(n: 2)"
+if isfile(joinpath(@__DIR__, "influxsettings.txt"))
+    token, org, bucket = readlines(joinpath(@__DIR__, "influxsettings.txt"))
+    influx = InfluxServer("http://localhost:8086", org, token)
+    measurementname = "juliatest"
+    ndata = 10
+    
+    @testset "writing" begin
+        testtable = DataFrame(Dict("timestamp"=>[now(UTC)-Second(ndata)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[rand(("String1", "String2", "String3")) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
+        writeresp = writetable(influx, bucket, measurementname, testtable)
+        @test writeresp.status == 204
+    end
 
-data = fluxquery(influx, querystring)
+    @testset "reading" begin
+        data = simplequery(influx, bucket, measurementname, ["Floatfield", "Intfield", "Stringfield", "Boolfield"], (now(UTC)-Day(2), now(UTC)); tags = ["tag1"=>"hello", "tag2" =>"hi"])
+        @test length(data) == 4
+        data = simplequery(influx, bucket, measurementname, ["Floatfield", "Intfield", "Stringfield", "Boolfield"], (now(UTC)-Day(2), now(UTC)))
+        @test length(data) == 4
+        @test size(data[1])[1] >= ndata
 
+        querystring = "from(bucket: \"$bucket\")
+        |>range(start: $(Dates.format(now(UTC)-Hour(1), "yyyy-mm-ddTHH:MM:SS.sZ")), stop: $(Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS.sZ")))
+        |>filter(fn: (r) => r[\"_measurement\"] == \"juliatest\")
+        |>filter(fn: (r) =>r[\"_field\"] == \"Floatfield\" or r[\"_field\"] == \"Intfield\")
+        |>filter(fn: (r) =>r[\"tag1\"] == \"hello\")
+        |>group(columns: [\"_field\"], mode: \"by\")
+        |>sort(columns: [\"_time\"])"
+
+        data = fluxquery(influx, querystring)
+        @test length(data) == 2
+    end
+end
