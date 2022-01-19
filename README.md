@@ -13,7 +13,7 @@ token = ...
 influx = InfluxServer("http://localhost:8086", org, token)
 
 data = DataFrame(Dict("timestamp" => [now(UTC)-Second(1), now(UTC)], "f_somefield" => [1.0, 2.0]))
-writetable(influx, data)
+writetable(influx, "MyBucket", "MyMeasurement", data)
 ```
 
 ### Writing line protocol
@@ -25,7 +25,7 @@ influx = InfluxServer("http://localhost:8086", org, token)
 
 linep = "mymeasurement somefield=1.0 1638004387370
 mymeasurement somefield=2.0 1638004388378"
-writelineprotocol(influx, linep; precision = :ms)
+writelineprotocol(influx, "MyBucket", "MyMeasurement", linep; precision = :ms)
 ```
 
 ## Reading
