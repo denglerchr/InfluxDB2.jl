@@ -25,7 +25,7 @@ influx = InfluxServer("http://localhost:8086", org, token)
 
 linep = "mymeasurement somefield=1.0 1638004387370
 mymeasurement somefield=2.0 1638004388378"
-writelineprotocol(influx, "MyBucket", "MyMeasurement", linep; precision = :ms)
+writelineprotocol(influx, "MyBucket", linep; precision = :ms)
 ```
 
 ## Reading
