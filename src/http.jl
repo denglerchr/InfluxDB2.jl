@@ -148,7 +148,7 @@ function parseinfluxresp(respstr::AbstractString)
     tablesstr = split(respstr, "\r\n\r\n")[1:end-1]
 
     # Transform each table string into a DataFrame
-    Out = Vector{DataFrame}(undef, length(tablesstr))
+    Out = Vector{DataFrame}(undef, 0)
     for (itab, tab) in enumerate(tablesstr)
         rows = split(tab, "\r\n"; limit = 2)
         typesinflux = split(rows[1], ',')
@@ -160,7 +160,8 @@ function parseinfluxresp(respstr::AbstractString)
         for i in ind
             dframe[!,i-1] = parseRFC3339.(dframe[:,i-1])
         end
-        Out[itab] = dframe
+        dfsgrouped = groupby(dframe, "table")
+        append!(Out, [DataFrame(df) for df in dfsgrouped])
     end
 
     return Out
