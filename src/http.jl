@@ -8,9 +8,9 @@ struct InfluxServer
     org::String
     token::String
     function InfluxServer(url::String, org::String, token::String)
-        resp = HTTP.get(url*"/ping", status_exception = false)
+        resp = HTTP.get(url*"/ping"; status_exception = false, connect_timeout = 3, readtimeout = 5)
         if resp.status != 204
-            println("Could not ping influxdb server. Response: $(resp.body)")
+            println("Could not ping influxdb server. Response: $(String(resp.body))")
         end
         return new(url, org, token)
     end
@@ -181,4 +181,4 @@ function parseRFC3339(dtiso)
 end
 
 
-ping(influx::InfluxServer) = HTTP.get(influx.url*"/ping")
+ping(influx::InfluxServer) = HTTP.get(influx.url*"/ping"; connect_timeout = 3, readtimeout = 5)
