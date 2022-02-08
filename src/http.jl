@@ -8,9 +8,16 @@ struct InfluxServer
     org::String
     token::String
     function InfluxServer(url::String, org::String, token::String)
+
+        # remove tailing / if existing 
+        if endswith(url, '/')
+            url = chop(url)
+        end
+
+        # try pinging it
         resp = HTTP.get(url*"/ping"; status_exception = false, connect_timeout = 3, readtimeout = 5)
         if !(resp.status in (200, 204))
-            println("Could not ping influxdb server. Response: $(String(resp.body))")
+            println("Could not ping influxdb server. Status $(resp.status): $(String(resp.body))")
         end
         return new(url, org, token)
     end
@@ -41,7 +48,7 @@ end
 
 
 function write(influx::InfluxServer, bucket::String, body::IOBuffer; precision::Union{Symbol, String} = :ms )
-    url = influx.url*"/api/v2/write?org="*HTTP.escape(influx.org)*"&bucket="*HTTP.escape(bucket)*"&precision="*string(precision)
+    url = influx.url*"/api/v2/write?org="*HTTP.escapeuri(influx.org)*"&bucket="*HTTP.escapeuri(bucket)*"&precision="*string(precision)
     # TODO add gzip possibility
     headers = ["Authorization"=>"Token "*influx.token, "Accept"=>"application/json", "Content-Encoding"=>"identity", "Content-Type"=>"text/plain"]
     HTTP.post(url, headers, body)
@@ -74,7 +81,7 @@ end
 
 
 function getorgid(influx::InfluxServer)
-    url = influx.url*"/api/v2/orgs?org="*HTTP.escape(influx.org)
+    url = influx.url*"/api/v2/orgs?org="*HTTP.escapeuri(influx.org)
     headers = ["Authorization"=>"Token "*influx.token]
     resp =  HTTP.get(url, headers)
     jsonobj = JSON3.read(resp.body)
@@ -88,7 +95,7 @@ end
 Query data and return a DataFrame for each table returned by InfluxDB.
 """
 function fluxquery(influx::InfluxServer, querystring::String)
-    url = influx.url*"/api/v2/query?org="*HTTP.escape(influx.org)
+    url = influx.url*"/api/v2/query?org="*HTTP.escapeuri(influx.org)
     # TODO add gzip possibility
     headers = ["Authorization"=>"Token "*influx.token, "Content-Type"=>"application/json", "Accept"=>"application/csv", "Accept-Encoding"=>"identity"]
     body = "{\"query\":"*JSON3.write(querystring)*",\"dialect\":{\"annotations\": [\"datatype\"],\"commentPrefix\": \"#\", \"dateTimeFormat\": \"RFC3339\"}}"
