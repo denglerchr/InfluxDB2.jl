@@ -9,7 +9,7 @@ struct InfluxServer
     token::String
     function InfluxServer(url::String, org::String, token::String)
         resp = HTTP.get(url*"/ping"; status_exception = false, connect_timeout = 3, readtimeout = 5)
-        if resp.status != 204
+        if !(resp.status in (200, 204))
             println("Could not ping influxdb server. Response: $(String(resp.body))")
         end
         return new(url, org, token)
