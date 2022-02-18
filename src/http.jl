@@ -1,5 +1,5 @@
 # https://docs.influxdata.com/influxdb/v2.1/api/
-using HTTP, JSON3, DataFrames, Dates, CSV
+using HTTP, JSON3, DataFrames, Dates, CSV, CodecZlib
 
 import Base.write
 
@@ -25,33 +25,44 @@ end
 
 
 """
-    writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms)
+    writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
 
 Write a table to the influx database. Fields and tags need to be
 specified using prefixes \"f_\" and \"t_\" respectively. A column namd timestamp needs to
 be provided which contains Int or DateTime entries.
+Compression can be set to :gzip to compress the line protocol before sending.
 """
-function writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms)
+function writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
     buffer = table2lineprotocol(measurement, table, precision = precision)
-    return write(influx, bucket, buffer; precision = precision)
+    return write(influx, bucket, buffer; precision = precision, compression = compression)
 end
 
 
 """
-    writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms)
+    writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
 
 Write data using the lineprotocol.
+Compression can be set to :gzip to compress the line protocol before sending.
 """
-function writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms)
-    return write(influx, bucket, IOBuffer(linep); precision = precision)
+function writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+    return write(influx, bucket, IOBuffer(linep); precision = precision, compression = compression)
 end
 
 
-function write(influx::InfluxServer, bucket::String, body::IOBuffer; precision::Union{Symbol, String} = :ms )
+function write(influx::InfluxServer, bucket::String, body::IOBuffer; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+    @assert(compression in (:identity, :gzip), "\"compression\" must be either :identity or :gzip.")
     url = influx.url*"/api/v2/write?org="*HTTP.escapeuri(influx.org)*"&bucket="*HTTP.escapeuri(bucket)*"&precision="*string(precision)
-    # TODO add gzip possibility
-    headers = ["Authorization"=>"Token "*influx.token, "Accept"=>"application/json", "Content-Encoding"=>"identity", "Content-Type"=>"text/plain"]
-    HTTP.post(url, headers, body)
+    headers = ["Authorization"=>"Token "*influx.token, "Accept"=>"application/json", "Content-Encoding"=>string(compression), "Content-Type"=>"text/plain"]
+
+    if compression == :gzip
+        # gzip compression before sending
+        compressed_body = GzipCompressorStream(body)
+        return HTTP.post(url, headers, compressed_body)
+
+    else
+        # no compression
+        return HTTP.post(url, headers, body)
+    end
 end
 
 
@@ -90,24 +101,39 @@ end
 
 
 """
-    fluxquery(influx::InfluxServer, querystring::String)
+    fluxquery(influx::InfluxServer, querystring::String; compression::Symbol = :identity)
 
 Query data and return a DataFrame for each table returned by InfluxDB.
 """
-function fluxquery(influx::InfluxServer, querystring::String)
+function fluxquery(influx::InfluxServer, querystring::String; compression::Symbol = :identity)
+    @assert(compression in (:identity, :gzip), "\"compression\" must be either :identity or :gzip.")
     url = influx.url*"/api/v2/query?org="*HTTP.escapeuri(influx.org)
-    # TODO add gzip possibility
-    headers = ["Authorization"=>"Token "*influx.token, "Content-Type"=>"application/json", "Accept"=>"application/csv", "Accept-Encoding"=>"identity"]
+    headers = ["Authorization"=>"Token "*influx.token, "Content-Type"=>"application/json", "Accept"=>"application/csv", "Accept-Encoding"=>string(compression)]
+
     body = "{\"query\":"*JSON3.write(querystring)*",\"dialect\":{\"annotations\": [\"datatype\"],\"commentPrefix\": \"#\", \"dateTimeFormat\": \"RFC3339\"}}"
     resp = HTTP.post(url, headers, body)
-    return parseinfluxresp( String(resp.body) )
+    
+    # Check if we received teh encoding we asked for (no Content-Encoding returned for identity)
+    resp_encoding = Symbol( get( Dict(resp.headers), "Content-Encoding", "identity") )
+    if resp_encoding != compression
+        @warn "Received Content-Encoding $resp_encoding but asked for $compression"
+    end
+
+    # Decompress answer if necessary
+    if resp_encoding == :gzip
+        influxans = String(transcode(GzipDecompressor, resp.body))
+    else
+        influxans = String(resp.body)
+    end
+
+    return parseinfluxresp( influxans )
 end
 
 
 """
-    simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing)
+    simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing, compression::Symbol = :identity)
 """
-function simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing)
+function simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing, compression::Symbol = :identity)
     @assert length(fields)>0
     from = Dates.format(timerange[1], "yyyy-mm-ddTHH:MM:SS.sZ")
     to = Dates.format(timerange[2], "yyyy-mm-ddTHH:MM:SS.sZ")
@@ -136,7 +162,7 @@ function simplequery(influx::InfluxServer, bucket::String, measurement::String, 
     end
     write(querybuffer, "|>group(columns: [\"_field\"], mode: \"by\")")
     write(querybuffer, "|>sort(columns: [\"_time\"])")
-    return fluxquery(influx, String(take!(querybuffer)))
+    return fluxquery(influx, String(take!(querybuffer)); compression = compression)
 end
 
 
