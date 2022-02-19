@@ -1,7 +1,7 @@
 # https://docs.influxdata.com/influxdb/v2.1/api/
 using HTTP, JSON3, DataFrames, Dates, CSV, CodecZlib
 
-import Base.write
+import Base.write, Base.show
 
 struct InfluxServer
     url::String
@@ -22,6 +22,9 @@ struct InfluxServer
         return new(url, org, token)
     end
 end
+
+show(io::IO, ::MIME"text/plain", influx::InfluxServer) = print(io, "InfluxServer(url:\"$(influx.url)\",org:\"$(influx.org)\";token:\"$(influx.token[1:4])...\")")
+show(io::IO, influx::InfluxServer) = show(io::IO, MIME("text/plain"), influx::InfluxServer)
 
 
 """
