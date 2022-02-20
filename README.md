@@ -54,7 +54,7 @@ querystring = "from(bucket: \"testbucket\")
 |>filter(fn: (r) => r[\"_measurement\"] == \"mymeasurement\")
 |>filter(fn: (r) =>r[\"_field\"] == \"somefield\" or r[\"_field\"] == \"anotherfield\")
 |>filter(fn: (r) =>r[\"sometag\"] == \"TagValue\")
-|>drop(columns: [\"_start\", \"_stop\"])
+|>drop(columns: [\"_measurement\", \"_start\", \"_stop\"])
 |>group(columns: [\"_field\"], mode: \"by\")
 |>sort(columns: [\"_time\"])"
 dataframes = fluxquery(influx, querystring)

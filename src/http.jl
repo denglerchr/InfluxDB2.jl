@@ -27,7 +27,7 @@ struct InfluxServer
     end
 end
 
-show(io::IO, ::MIME"text/plain", influx::InfluxServer) = print(io, "InfluxServer(url:\"$(influx.url)\",org:\"$(influx.org)\";token:\"$(influx.token[1:4])...\")")
+show(io::IO, ::MIME"text/plain", influx::InfluxServer) = print(io, "InfluxServer(url:\"$(influx.url)\",org:\"$(influx.org)\",token:\"$(influx.token[1:4])...\")")
 show(io::IO, influx::InfluxServer) = show(io::IO, MIME("text/plain"), influx::InfluxServer)
 
 
@@ -167,7 +167,7 @@ function simplequery(influx::InfluxServer, bucket::String, measurement::String, 
         end
         Base.write(querybuffer, ")\n")
     end
-    Base.write(querybuffer, "|>drop(columns: [\"_start\", \"_stop\"])")
+    Base.write(querybuffer, "|>drop(columns: [\"_measurement\", \"_start\", \"_stop\"])")
     Base.write(querybuffer, "|>group(columns: [\"_field\"], mode: \"by\")")
     Base.write(querybuffer, "|>sort(columns: [\"_time\"])")
     return fluxquery(influx, String(take!(querybuffer)); compression = compression)

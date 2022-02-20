@@ -43,7 +43,7 @@ if isfile(joinpath(@__DIR__, "influxsettings.txt"))
         |>filter(fn: (r) => r[\"_measurement\"] == \"$measurementname\")
         |>filter(fn: (r) =>r[\"_field\"] == \"Floatfield\" or r[\"_field\"] == \"Intfield\")
         |>filter(fn: (r) =>r[\"tag1\"] == \"hello\")
-        |>drop(columns: [\"_start\", \"_stop\"])
+        |>drop(columns: [\"_measurement\", \"_start\", \"_stop\"])
         |>group(columns: [\"_field\"], mode: \"by\")
         |>sort(columns: [\"_time\"])"
 
