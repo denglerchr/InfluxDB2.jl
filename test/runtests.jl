@@ -39,10 +39,11 @@ if isfile(joinpath(@__DIR__, "influxsettings.txt"))
         @test size(data[1], 1) >= ndata
 
         querystring = "from(bucket: \"$bucket\")
-        |>range(start: $(Dates.format(now(UTC)-Hour(2), "yyyy-mm-ddTHH:MM:SS.sZ")), stop: $(Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS.sZ")))
+        |>range(start: $(Dates.format(now(UTC)-Day(2), "yyyy-mm-ddTHH:MM:SS.sZ")), stop: $(Dates.format(now(UTC), "yyyy-mm-ddTHH:MM:SS.sZ")))
         |>filter(fn: (r) => r[\"_measurement\"] == \"$measurementname\")
         |>filter(fn: (r) =>r[\"_field\"] == \"Floatfield\" or r[\"_field\"] == \"Intfield\")
         |>filter(fn: (r) =>r[\"tag1\"] == \"hello\")
+        |>drop(columns: [\"_start\", \"_stop\"])
         |>group(columns: [\"_field\"], mode: \"by\")
         |>sort(columns: [\"_time\"])"
 

@@ -143,28 +143,29 @@ function simplequery(influx::InfluxServer, bucket::String, measurement::String, 
 
     # Create flux query
     querybuffer = IOBuffer()
-    write(querybuffer, "from(bucket: \"$bucket\")\n")
-    write(querybuffer, "|>range(start: $from, stop: $to)\n")
-    write(querybuffer, "|>filter(fn: (r) => r[\"_measurement\"] == \"$measurement\")\n")
-    write(querybuffer, "|>filter(fn: (r) =>r[\"_field\"] == \"$(fields[1])\"")
+    Base.write(querybuffer, "from(bucket: \"$bucket\")\n")
+    Base.write(querybuffer, "|>range(start: $from, stop: $to)\n")
+    Base.write(querybuffer, "|>filter(fn: (r) => r[\"_measurement\"] == \"$measurement\")\n")
+    Base.write(querybuffer, "|>filter(fn: (r) =>r[\"_field\"] == \"$(fields[1])\"")
     for f in fields[2:end]
-        write(querybuffer, " or r[\"_field\"] == \"$f\"")
+        Base.write(querybuffer, " or r[\"_field\"] == \"$f\"")
     end
-    write(querybuffer, ")\n")
+    Base.write(querybuffer, ")\n")
     if !isnothing(tags)
         i = iterate(tags)
         (k, v) = i[1]
-        write(querybuffer, "|>filter(fn: (r)=>r[\"$(string(k))\"]==\"$(string(v))\"")
+        Base.write(querybuffer, "|>filter(fn: (r)=>r[\"$(string(k))\"]==\"$(string(v))\"")
         i = iterate(tags, i[2])
         while !isnothing(i)
             (k, v) = i[1]
-            write(querybuffer, " or r[\"$(string(k))\"]==\"$(string(v))\"")
+            Base.write(querybuffer, " or r[\"$(string(k))\"]==\"$(string(v))\"")
             i = iterate(tags, i[2])
         end
-        write(querybuffer, ")\n")
+        Base.write(querybuffer, ")\n")
     end
-    write(querybuffer, "|>group(columns: [\"_field\"], mode: \"by\")")
-    write(querybuffer, "|>sort(columns: [\"_time\"])")
+    Base.write(querybuffer, "|>drop(columns: [\"_start\", \"_stop\"])")
+    Base.write(querybuffer, "|>group(columns: [\"_field\"], mode: \"by\")")
+    Base.write(querybuffer, "|>sort(columns: [\"_time\"])")
     return fluxquery(influx, String(take!(querybuffer)); compression = compression)
 end
 
