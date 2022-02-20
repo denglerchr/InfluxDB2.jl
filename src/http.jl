@@ -13,13 +13,17 @@ struct InfluxServer
         if endswith(url, '/')
             url = chop(url)
         end
+        influx = new(url, org, token)
 
         # try pinging it
-        resp = HTTP.get(url*"/ping"; status_exception = false, connect_timeout = 3, readtimeout = 5)
-        if !(resp.status in (200, 204))
-            println("Could not ping influxdb server. Status $(resp.status): $(String(resp.body))")
+        resp = ping(influx)
+        if resp.status != 204
+            @warn("Ping status, expected 204, got $(resp.status)")
         end
-        return new(url, org, token)
+        # TODO check version, but receive empty string?
+        #headers = Dict(resp.headers)
+        #headers["X-Influxdb-Version"] < v"2.0" && @warn "..."
+        return influx
     end
 end
 
@@ -219,4 +223,4 @@ function parseRFC3339(dtiso)
 end
 
 
-ping(influx::InfluxServer) = HTTP.get(influx.url*"/ping"; connect_timeout = 3, readtimeout = 5)
+ping(influx::InfluxServer) = HTTP.get(influx.url*"/ping"; status_exception = false, connect_timeout = 3, readtimeout = 5)
