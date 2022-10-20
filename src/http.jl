@@ -106,6 +106,22 @@ function getorgid(influx::InfluxServer)
     return jsonobj.orgs[1].id
 end
 
+"""
+    delete(influx::InfluxServer, timerange::Tuple{DateTime, DateTime}, predicate::String = "")
+
+Delete data in InfluxDB in a given timerange. Predicate can be used to specify which data to delete. Quotes need to be escaped properly in *predicate*. 
+E.g.: _measurement=\"example-measurement\" AND exampleTag=\"exampleTagValue\"
+"""
+function delete(influx::InfluxServer, bucket::String, timerange::Tuple{DateTime, DateTime}, predicate::String = "")
+    url = influx.url*"/api/v2/delete?org="*HTTP.escapeuri(influx.org)*"&bucket="*HTTP.escapeuri(bucket)
+    headers = ["Authorization"=>"Token "*influx.token]
+
+    bodydict = Dict{String, String}(["start"=>string( timerange[1] ) * "Z", "stop"=>string( timerange[2] ) * "Z"])
+    !isempty(predicate)  && ( bodydict["predicate"] = predicate )
+    body = JSON3.write(bodydict)
+    return HTTP.post(url, headers, body)
+end
+
 
 """
     fluxquery(influx::InfluxServer, querystring::String; compression::Symbol = :identity)
