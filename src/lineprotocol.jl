@@ -4,7 +4,7 @@ using Tables, Dates
 
 const precisiondict = Base.ImmutableDict(:ns=>10.0^9, :us=>10.0^6, :ms=>10.0^3, :s=>1.0)
 
-function table2lineprotocol(measurementname::String, datatable; precision::Union{Symbol, String} = :ms)
+function table2lineprotocol(datatable; precision::Union{Symbol, String} = :ms)
 
     # basic checks
     @assert Tables.istable(datatable)
@@ -26,6 +26,8 @@ function table2lineprotocol(measurementname::String, datatable; precision::Union
     end
 
     @assert(:timestamp in colnames, "The table needs to have a column \"timestamp\".")
+    @assert(:measurement in colnames, "The table needs to have a column \"measurement\".")
+    @assert( Tables.columntype(datatable, :measurement)<:AbstractString, "The column \"measurement\" has to contain elements of type T<:AbstractString only." )
     @assert( !isempty(fieldnames), "Atleast one field must be provided, i.e., a column name starting with \"f_\"")
     sort!(fieldnames)
     sort!(tagnames)
@@ -41,7 +43,7 @@ function table2lineprotocol(measurementname::String, datatable; precision::Union
         tagnamestring = gettagsstring(row, tagnames)
         timestampstring = gettimestampstring( Tables.getcolumn(row, :timestamp); precision = precision )
 
-        write(buffer, measurementname)
+        write(buffer, string(Tables.getcolumn(row, :measurement)) )
         if length(tagnamestring)>0
             write(buffer, ',')
             write(buffer, tagnamestring)
@@ -56,6 +58,7 @@ function table2lineprotocol(measurementname::String, datatable; precision::Union
     return buffer
 end
 
+# Returns the string of "fieldname1=value1,fieldname2=value2,..." for a given row of the table.
 function getfieldsstring(data, colnames::Vector{Symbol})
     Out = Vector{String}(undef, length(colnames))
     i = 1

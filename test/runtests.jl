@@ -4,27 +4,27 @@ using CSV, DataFrames, InfluxDB2, Dates, Test, HTTP
 @testset "lineprotocol" begin
     testtable = CSV.File(joinpath(@__DIR__, "testtable.csv"))
 
-    iobuffer = InfluxDB2.table2lineprotocol("testmeasurement", testtable; precision = :ms)
+    iobuffer = InfluxDB2.table2lineprotocol(testtable; precision = :ms)
     correctlinep = "testmeasurement,c=hello b=2.0 1637496010000\ntestmeasurement,c=world b=4.0 1637496070000\ntestmeasurement,c=hello b=6.0 1637496130000\n"
     @test String(take!(iobuffer)) == correctlinep
 end
 
 
 if isfile(joinpath(@__DIR__, "influxsettings.txt"))
-    token, org, bucket = readlines(joinpath(@__DIR__, "influxsettings.txt"))
-    influx = InfluxServer("http://localhost:8086", org, token)
+    url, token, org, bucket = readlines(joinpath(@__DIR__, "influxsettings.txt"))
+    influx = InfluxServer(url, org, token)
     measurementname = "juliatest"
     ndata = 10
     
     @testset "writing" begin
         # write without compression
-        testtable = DataFrame(Dict("timestamp"=>[now(UTC)-Second(ndata)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[rand(("String1", "String2", "String3")) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
-        writeresp = writetable(influx, bucket, measurementname, testtable)
+        testtable = DataFrame(Dict("measurement"=>[measurementname for i = 1:ndata], "timestamp"=>[now(UTC)-Second(ndata)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[rand(("String1", "String2", "String3")) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
+        writeresp = writetable(influx, bucket, testtable)
         @test writeresp.status == 204
 
         # write using gzip compression
-        testtable2 = DataFrame(Dict("timestamp"=>[now(UTC)-Second(ndata*2)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[rand(("String1", "String2", "String3")) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
-        writeresp = writetable(influx, bucket, measurementname, testtable2; compression = :gzip)
+        testtable2 = DataFrame(Dict("measurement"=>[measurementname for i = 1:ndata], "timestamp"=>[now(UTC)-Second(ndata*2)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[rand(("String1", "String2", "String3")) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
+        writeresp = writetable(influx, bucket, testtable2; compression = :gzip)
         @test writeresp.status == 204
     end
 

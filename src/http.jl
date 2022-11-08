@@ -35,12 +35,12 @@ show(io::IO, influx::InfluxServer) = show(io::IO, MIME("text/plain"), influx::In
     writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
 
 Write a table to the influx database. Fields and tags need to be
-specified using prefixes \"f_\" and \"t_\" respectively. A column namd timestamp needs to
-be provided which contains Int or DateTime entries.
+specified using prefixes \"f_\" and \"t_\" respectively. A column namd "measurement" and "timestamp" need to
+be provided. The "timestamp" column can contain Int or DateTime entries.
 Compression can be set to :gzip to compress the line protocol before sending.
 """
-function writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
-    buffer = table2lineprotocol(measurement, table, precision = precision)
+function writetable(influx::InfluxServer, bucket::String, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+    buffer = table2lineprotocol(table, precision = precision)
     return write(influx, bucket, buffer; precision = precision, compression = compression)
 end
 
