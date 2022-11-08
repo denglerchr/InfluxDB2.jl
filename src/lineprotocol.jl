@@ -25,7 +25,9 @@ function table2lineprotocol(datatable; precision::Union{Symbol, String} = :ms)
         @assert(T<:Union{AbstractString, Missing}, "Tags must be of type String, got $T in tag $(string(tname)[3:end])")
     end
 
+    # Check column types for timestamp and measurement
     @assert(:timestamp in colnames, "The table needs to have a column \"timestamp\".")
+    @assert( Tables.columntype(datatable, :timestamp)<:Union{Dates.DateTime, Integer}, "The column \"timestamp\" has to be of eltype DateTime or Integer." )
     @assert(:measurement in colnames, "The table needs to have a column \"measurement\".")
     @assert( Tables.columntype(datatable, :measurement)<:AbstractString, "The column \"measurement\" has to contain elements of type T<:AbstractString only." )
     @assert( !isempty(fieldnames), "Atleast one field must be provided, i.e., a column name starting with \"f_\"")

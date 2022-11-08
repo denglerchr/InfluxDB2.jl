@@ -32,7 +32,7 @@ show(io::IO, influx::InfluxServer) = show(io::IO, MIME("text/plain"), influx::In
 
 
 """
-    writetable(influx::InfluxServer, bucket::String, measurement, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+    writetable(influx::InfluxServer, bucket::String, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
 
 Write a table to the influx database. Fields and tags need to be
 specified using prefixes \"f_\" and \"t_\" respectively. A column namd "measurement" and "timestamp" need to
