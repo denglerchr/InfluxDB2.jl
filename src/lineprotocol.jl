@@ -4,6 +4,12 @@ using Tables, Dates
 
 const precisiondict = Base.ImmutableDict(:ns=>10.0^9, :us=>10.0^6, :ms=>10.0^3, :s=>1.0)
 
+"""
+    table2lineprotocol(datatable; precision = :ms)
+
+Translate a Table into a line protocoll, required by InfluxDB. The table needs to contain columns "timestamp" and "measurement".
+Returns an IOBuffer.
+"""
 function table2lineprotocol(datatable; precision::Union{Symbol, String} = :ms)
 
     # basic checks
