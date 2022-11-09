@@ -41,7 +41,9 @@ Compression can be set to :gzip to compress the line protocol before sending.
 """
 function writetable(influx::InfluxServer, bucket::String, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
     buffer = table2lineprotocol(table, precision = precision)
-    return write(influx, bucket, buffer; precision = precision, compression = compression)
+    resp = write(influx, bucket, buffer; precision = precision, compression = compression)
+    close(buffer)
+    return resp
 end
 
 
@@ -52,7 +54,10 @@ Write data using the lineprotocol.
 Compression can be set to :gzip to compress the line protocol before sending.
 """
 function writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
-    return write(influx, bucket, IOBuffer(linep); precision = precision, compression = compression)
+    buffer = IOBuffer(linep)
+    resp = write(influx, bucket, buffer; precision = precision, compression = compression)
+    close(buffer)
+    return resp
 end
 
 
