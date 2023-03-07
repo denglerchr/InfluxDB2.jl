@@ -18,7 +18,8 @@ function table2lineprotocol(datatable; precision::Union{Symbol, String} = :ms)
     @assert(precision in keys(precisiondict), "Precision must be one of :ns, :us, :ms, :s")
 
     # get column names and make sure they are ok
-    colnames = Tables.columnnames(datatable)
+    colnamesiterable = Tables.columnnames(datatable)
+    colnames = [Symbol(c) for c in colnamesiterable] # make sure we have a Vector of Symbols
     fieldnames = filter(x->startswith(string(x), "f_") && length(string(x))>2, colnames)
 
     tagnames = filter(x->startswith(string(x), "t_") && length(string(x))>2, colnames)

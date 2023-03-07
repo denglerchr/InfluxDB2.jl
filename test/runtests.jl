@@ -26,6 +26,11 @@ if isfile(joinpath(@__DIR__, "influxsettings.txt"))
         testtable2 = DataFrame(Dict("measurement"=>[measurementname for i = 1:ndata], "timestamp"=>[now(UTC)-Second(ndata*2)+Second(i) for i = 1:ndata], "f_Floatfield"=>randn(ndata), "f_Intfield"=>rand(1:10, ndata), "f_Stringfield"=>[rand(("String1", "String2", "String3")) for _ =1:ndata], "f_Boolfield"=>rand((false, true), ndata), "t_tag1"=>[rand(["hello", "world"]) for _ =1:ndata]))
         writeresp = writetable(influx, bucket, testtable2; compression = :gzip)
         @test writeresp.status == 204
+
+        # write using a different table
+        testtable3 = (measurement=[measurementname for i = 1:ndata], timestamp=[now(UTC)-Second(ndata*3)+Second(i) for i = 1:ndata], f_Floatfield=randn(ndata), f_Intfield=rand(1:10, ndata), f_Stringfield=[rand(("String1", "String2", "String3")) for _ =1:ndata], f_Boolfield=rand((false, true), ndata), t_tag1=[rand(["hello", "world"]) for _ =1:ndata])
+        writeresp = writetable(influx, bucket, testtable3)
+        @test writeresp.status == 204
     end
 
     @testset "reading" begin
