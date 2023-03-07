@@ -20,10 +20,6 @@ function table2lineprotocol(datatable; precision::Union{Symbol, String} = :ms)
     # get column names and make sure they are ok
     colnames = Tables.columnnames(datatable)
     fieldnames = filter(x->startswith(string(x), "f_") && length(string(x))>2, colnames)
-    for fname in fieldnames
-        T = Tables.columntype(datatable, fname)
-        @assert(T<:Union{AbstractFloat, Integer, AbstractString, Bool, Missing}, "Only numbers and strings are supported, got $T in field $(string(fname)[3:end])")
-    end
 
     tagnames = filter(x->startswith(string(x), "t_") && length(string(x))>2, colnames)
     for tname in tagnames
@@ -86,6 +82,7 @@ end
 jl2linepstr(x::Integer) = string(x)*'i'
 jl2linepstr(x::AbstractString) = '\"'*x*'\"'
 jl2linepstr(x::Union{Bool, AbstractFloat}) = string(x)
+jl2linepstr(x::T) = throw("Only numbers, strings and boolean are supported in fields, got $T")
 
 function gettagsstring(data, colnames::Vector{Symbol})
     Out = Vector{String}(undef, length(colnames))
