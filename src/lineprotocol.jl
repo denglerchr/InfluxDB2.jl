@@ -82,7 +82,7 @@ end
 jl2linepstr(x::Integer) = string(x)*'i'
 jl2linepstr(x::AbstractString) = '\"'*x*'\"'
 jl2linepstr(x::Union{Bool, AbstractFloat}) = string(x)
-jl2linepstr(x::T) = throw("Only numbers, strings and boolean are supported in fields, got $T")
+jl2linepstr(_::T) where {T} = throw("Only numbers, strings and boolean are supported in fields, got $T")
 
 function gettagsstring(data, colnames::Vector{Symbol})
     Out = Vector{String}(undef, length(colnames))
