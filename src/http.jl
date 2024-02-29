@@ -230,9 +230,10 @@ function parseinfluxresp(respstr::AbstractString)
 end
 
 # A lot faster than using DateTime parser
-function parseRFC3339(dtiso)
+function parseRFC3339(dtiso::String)
     strlen = length(dtiso)
-    dtiso2 = ifelse( strlen<24, dtiso[1:end-1]*"0000", dtiso)
+    strlen < 20 && error("Invalid DateTime string.")
+    dtiso2 = ifelse( strlen==20, dtiso[1:end-1]*".000", dtiso[1:end-1]*"000")
     year = parse(Int,dtiso2[1:4])
     month = parse(Int,dtiso2[6:7])
     day = parse(Int,dtiso2[9:10])
