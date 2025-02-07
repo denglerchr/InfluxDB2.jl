@@ -12,7 +12,7 @@ end
 
 if isfile(joinpath(@__DIR__, "influxsettings.txt"))
     url, token, org, bucket = readlines(joinpath(@__DIR__, "influxsettings.txt"))
-    influx = InfluxServer(url, org, token)
+    influx = Client_v2(url, org, token)
     measurementname = "juliatest"
     ndata = 10
     

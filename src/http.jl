@@ -3,11 +3,11 @@ using HTTP, JSON3, DataFrames, Dates, CSV, CodecZlib
 
 import Base.write, Base.show
 
-struct InfluxServer
+struct Client_v2
     url::String
     org::String
     token::String
-    function InfluxServer(url::String, org::String, token::String)
+    function Client_v2(url::String, org::String, token::String)
 
         # remove tailing / if existing 
         if endswith(url, '/')
@@ -27,19 +27,19 @@ struct InfluxServer
     end
 end
 
-show(io::IO, ::MIME"text/plain", influx::InfluxServer) = print(io, "InfluxServer(url:\"$(influx.url)\",org:\"$(influx.org)\",token:\"$(influx.token[1:4])...\")")
-show(io::IO, influx::InfluxServer) = show(io::IO, MIME("text/plain"), influx::InfluxServer)
+show(io::IO, ::MIME"text/plain", influx::Client_v2) = print(io, "Client_v2(url:\"$(influx.url)\",org:\"$(influx.org)\",token:\"$(influx.token[1:4])...\")")
+show(io::IO, influx::Client_v2) = show(io::IO, MIME("text/plain"), influx::Client_v2)
 
 
 """
-    writetable(influx::InfluxServer, bucket::String, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+    writetable(influx::Client_v2, bucket::String, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
 
 Write a table to the influx database. Fields and tags need to be
 specified using prefixes \"f_\" and \"t_\" respectively. A column namd "measurement" and "timestamp" need to
 be provided. The "timestamp" column can contain Int or DateTime entries.
 Compression can be set to :gzip to compress the line protocol before sending.
 """
-function writetable(influx::InfluxServer, bucket::String, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+function writetable(influx::Client_v2, bucket::String, table; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
     buffer = table2lineprotocol(table, precision = precision)
     resp = write(influx, bucket, buffer; precision = precision, compression = compression)
     close(buffer)
@@ -48,12 +48,12 @@ end
 
 
 """
-    writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+    writelineprotocol(influx::Client_v2, bucket::String, linep::String; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
 
 Write data using the lineprotocol.
 Compression can be set to :gzip to compress the line protocol before sending.
 """
-function writelineprotocol(influx::InfluxServer, bucket::String, linep::String; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+function writelineprotocol(influx::Client_v2, bucket::String, linep::String; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
     buffer = IOBuffer(linep)
     resp = write(influx, bucket, buffer; precision = precision, compression = compression)
     close(buffer)
@@ -61,7 +61,7 @@ function writelineprotocol(influx::InfluxServer, bucket::String, linep::String; 
 end
 
 
-function write(influx::InfluxServer, bucket::String, body::IOBuffer; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
+function write(influx::Client_v2, bucket::String, body::IOBuffer; precision::Union{Symbol, String} = :ms, compression::Symbol = :identity)
     @assert(compression in (:identity, :gzip), "\"compression\" must be either :identity or :gzip.")
     url = influx.url*"/api/v2/write?org="*HTTP.escapeuri(influx.org)*"&bucket="*HTTP.escapeuri(bucket)*"&precision="*string(precision)
     headers = ["Authorization"=>"Token "*influx.token, "Accept"=>"application/json", "Content-Encoding"=>string(compression), "Content-Type"=>"text/plain"]
@@ -78,9 +78,9 @@ function write(influx::InfluxServer, bucket::String, body::IOBuffer; precision::
 end
 
 
-listbuckets(influx::InfluxServer) = fluxquery(influx, "buckets()")
-listmeasurements(influx::InfluxServer, bucket::String) = fluxquery(influx, "import \"influxdata/influxdb/schema\"\nschema.measurements(bucket: \"$bucket\")")
-function listfields(influx::InfluxServer, bucket::String, measurement::String)
+listbuckets(influx::Client_v2) = fluxquery(influx, "buckets()")
+listmeasurements(influx::Client_v2, bucket::String) = fluxquery(influx, "import \"influxdata/influxdb/schema\"\nschema.measurements(bucket: \"$bucket\")")
+function listfields(influx::Client_v2, bucket::String, measurement::String)
     querystring = "import \"influxdata/influxdb/schema\"\n
     schema.measurementFieldKeys(\n
     bucket: \"$bucket\",\n
@@ -90,11 +90,11 @@ end
 
 
 """
-    listorgs(influx::InfluxServer)
+    listorgs(influx::Client_v2)
 
 Return tuples containing the name and id of the organisations.
 """
-function listorgs(influx::InfluxServer)
+function listorgs(influx::Client_v2)
     url = influx.url*"/api/v2/orgs"
     headers = ["Authorization"=>"Token "*influx.token]
     resp =  HTTP.get(url, headers)
@@ -103,7 +103,7 @@ function listorgs(influx::InfluxServer)
 end
 
 
-function getorgid(influx::InfluxServer)
+function getorgid(influx::Client_v2)
     url = influx.url*"/api/v2/orgs?org="*HTTP.escapeuri(influx.org)
     headers = ["Authorization"=>"Token "*influx.token]
     resp =  HTTP.get(url, headers)
@@ -112,12 +112,12 @@ function getorgid(influx::InfluxServer)
 end
 
 """
-    delete(influx::InfluxServer, timerange::Tuple{DateTime, DateTime}, predicate::String = "")
+    delete(influx::Client_v2, timerange::Tuple{DateTime, DateTime}, predicate::String = "")
 
 Delete data in InfluxDB in a given timerange. Predicate can be used to specify which data to delete. Quotes need to be escaped properly in *predicate*. 
 E.g.: _measurement=\"example-measurement\" AND exampleTag=\"exampleTagValue\"
 """
-function delete(influx::InfluxServer, bucket::String, timerange::Tuple{DateTime, DateTime}, predicate::String = "")
+function delete(influx::Client_v2, bucket::String, timerange::Tuple{DateTime, DateTime}, predicate::String = "")
     url = influx.url*"/api/v2/delete?org="*HTTP.escapeuri(influx.org)*"&bucket="*HTTP.escapeuri(bucket)
     headers = ["Authorization"=>"Token "*influx.token]
 
@@ -129,11 +129,11 @@ end
 
 
 """
-    fluxquery(influx::InfluxServer, querystring::String; compression::Symbol = :identity)
+    fluxquery(influx::Client_v2, querystring::String; compression::Symbol = :identity)
 
 Query data and return a DataFrame for each table returned by InfluxDB.
 """
-function fluxquery(influx::InfluxServer, querystring::String; compression::Symbol = :identity)
+function fluxquery(influx::Client_v2, querystring::String; compression::Symbol = :identity)
     @assert(compression in (:identity, :gzip), "\"compression\" must be either :identity or :gzip.")
     url = influx.url*"/api/v2/query?org="*HTTP.escapeuri(influx.org)
     headers = ["Authorization"=>"Token "*influx.token, "Content-Type"=>"application/json", "Accept"=>"application/csv", "Accept-Encoding"=>string(compression)]
@@ -159,9 +159,9 @@ end
 
 
 """
-    simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing, compression::Symbol = :identity)
+    simplequery(influx::Client_v2, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing, compression::Symbol = :identity)
 """
-function simplequery(influx::InfluxServer, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing, compression::Symbol = :identity)
+function simplequery(influx::Client_v2, bucket::String, measurement::String, fields::Vector{String}, timerange::Tuple{DateTime, DateTime}; tags = nothing, compression::Symbol = :identity)
     @assert length(fields)>0
     from = Dates.format(timerange[1], "yyyy-mm-ddTHH:MM:SS.sZ")
     to = Dates.format(timerange[2], "yyyy-mm-ddTHH:MM:SS.sZ")
@@ -245,4 +245,4 @@ function parseRFC3339(dtiso::String)
 end
 
 
-ping(influx::InfluxServer) = HTTP.get(influx.url*"/ping"; status_exception = false, connect_timeout = 3, readtimeout = 5)
+ping(influx::Client_v2) = HTTP.get(influx.url*"/ping"; status_exception = false, connect_timeout = 3, readtimeout = 5)

@@ -43,10 +43,10 @@ function table2lineprotocol(datatable; precision::Union{Symbol, String} = :ms)
     # accumulate string in a buffer
     buffer = IOBuffer()
     for row in rows
-        fieldnamestring = getfieldsstring(row, fieldnames)
+        fieldnamestring = _get_fields_string(row, fieldnames)
         length(fieldnamestring) == 0 && continue # must have atleast one field
-        tagnamestring = gettagsstring(row, tagnames)
-        timestampstring = gettimestampstring( Tables.getcolumn(row, :timestamp); precision = precision )
+        tagnamestring = _get_tags_string(row, tagnames)
+        timestampstring = _get_timestamp_string( Tables.getcolumn(row, :timestamp); precision = precision )
 
         write(buffer, string(Tables.getcolumn(row, :measurement)) )
         if length(tagnamestring)>0
@@ -64,7 +64,7 @@ function table2lineprotocol(datatable; precision::Union{Symbol, String} = :ms)
 end
 
 # Returns the string of "fieldname1=value1,fieldname2=value2,..." for a given row of the table.
-function getfieldsstring(data, colnames::Vector{Symbol})
+function _get_fields_string(data, colnames::Vector{Symbol})
     Out = Vector{String}(undef, length(colnames))
     i = 1
     for coln in colnames
@@ -85,7 +85,7 @@ jl2linepstr(x::AbstractString) = '\"'*x*'\"'
 jl2linepstr(x::Union{Bool, AbstractFloat}) = string(x)
 jl2linepstr(_::T) where {T} = throw("Only numbers, strings and boolean are supported in fields, got $T")
 
-function gettagsstring(data, colnames::Vector{Symbol})
+function _get_tags_string(data, colnames::Vector{Symbol})
     Out = Vector{String}(undef, length(colnames))
     i = 1
     for coln in colnames
@@ -101,9 +101,9 @@ function gettagsstring(data, colnames::Vector{Symbol})
     return join( view(Out, 1:i-1), ',')
 end
 
-gettimestampstring(timestamp::T; precision::Symbol = :ms) where {T<:Integer} = string(timestamp)
+_get_timestamp_string(timestamp::T; precision::Symbol = :ms) where {T<:Integer} = string(timestamp)
 
-function gettimestampstring(timestamp::T; precision::Symbol = :ms) where {T<:Dates.DateTime}
+function _get_timestamp_string(timestamp::T; precision::Symbol = :ms) where {T<:Dates.DateTime}
     factor = precisiondict[precision]
     return string( round(UInt64, datetime2unix(timestamp)*factor) )
 end
